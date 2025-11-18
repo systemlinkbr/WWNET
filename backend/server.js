@@ -34,28 +34,24 @@ app.post('/create-payment', async (req, res) => {
         return res.status(400).json({ error: 'Todos os campos são obrigatórios.' });
     }
 
-    // AJUSTE: A documentação do AbacatePay indica que os dados de CPF e telefone
-    // devem ser enviados com a máscara. O frontend já envia os dados formatados.
-    // const cleanCpf = cpf.replace(/\D/g, ''); // Removido
-    // const cleanPhone = phone.replace(/\D/g, ''); // Removido
-
-
     // --- CHAMADA REAL PARA A API ABACATE PAY ---
-    const abacateApiUrl = 'https://api.abacatepay.com/v1/pixQrCode/create';
+    const abacateApiUrl = 'https://api.abacatepay.com/v1/pix-qrcodes'; // URL CORRIGIDA
     const payload = {
         amount: 500, // R$ 5,00 em centavos
-        expiresIn: 3600, // Expira em 1 hora
+        expires_in: 3600, // Expira em 1 hora (campo corrigido)
         description: 'Acesso Vitalício - Balança Web Simples',
         customer: {
             name: name,
-            cellphone: phone, // Usando o valor original com máscara, conforme documentação
+            cellphone: phone, // Frontend já envia com máscara
             email: email,
-            taxId: cpf    // Usando o valor original com máscara, conforme documentação
+            tax_id: cpf    // Frontend já envia com máscara (campo corrigido)
         },
         metadata: {
             externalId: `balanca-web-${Date.now()}`
         }
     };
+
+    console.log("BACKEND: Enviando payload para Abacate Pay:", JSON.stringify(payload));
 
     const abacatePayResponse = await fetch(abacateApiUrl, {
       method: 'POST',
@@ -68,20 +64,19 @@ app.post('/create-payment', async (req, res) => {
 
     if (!abacatePayResponse.ok) {
       const errorBody = await abacatePayResponse.text();
-      console.error("Erro da API Abacate Pay:", errorBody);
+      console.error("Erro da API Abacate Pay:", abacatePayResponse.status, errorBody);
       throw new Error(`Falha na comunicação com a Abacate Pay: ${abacatePayResponse.statusText}`);
     }
     
-    // A documentação do AbacatePay indica os seguintes campos na resposta de sucesso:
-    // { "id": "...", "qrCodeImageBase64": "...", "qrCodeCopyPaste": "..." }
+    // Documentação indica os campos: { "id": "...", "qr_code_base64": "...", "qr_code_text": "..." }
     const paymentData = await abacatePayResponse.json();
     console.log("BACKEND: Pagamento PIX criado com sucesso:", paymentData.id);
 
-    // Envia de volta para o frontend os dados necessários para exibir o PIX
+    // Envia de volta para o frontend os dados necessários para exibir o PIX (mapeamento corrigido)
     res.status(201).json({
       paymentId: paymentData.id,
-      qrCode: `data:image/png;base64,${paymentData.qrCodeImageBase64}`,
-      copiaECola: paymentData.qrCodeCopyPaste
+      qrCode: `data:image/png;base64,${paymentData.qr_code_base64}`,
+      copiaECola: paymentData.qr_code_text
     });
 
   } catch (error) {
@@ -97,8 +92,7 @@ app.get('/payment-status/:id', async (req, res) => {
     console.log(`BACKEND: Verificando status do pagamento ${paymentId}...`);
 
     // --- CHAMADA REAL PARA A API ABACATE PAY ---
-    // Este endpoint é uma suposição, você deve ajustá-lo para o endpoint real da Abacate Pay
-    const abacateApiUrl = `https://api.abacatepay.com/v1/pixQrCode/status/${paymentId}`;
+    const abacateApiUrl = `https://api.abacatepay.com/v1/pix-qrcodes/${paymentId}`; // URL CORRIGIDA
     
     const apiResponse = await fetch(abacateApiUrl, {
       method: 'GET',
@@ -112,19 +106,21 @@ app.get('/payment-status/:id', async (req, res) => {
     }
 
     if (!apiResponse.ok) {
+      const errorBody = await apiResponse.text();
+      console.error("Erro ao consultar status na Abacate Pay:", apiResponse.status, errorBody);
       throw new Error(`Erro ao consultar status na Abacate Pay: ${apiResponse.statusText}`);
     }
     
-    // Assumindo que a resposta da API tem a estrutura: { "id": "...", "status": "paid" | "pending" }
+    // Estrutura esperada: { "id": "...", "status": "PAID" | "PENDING_PAYMENT" }
     const statusData = await apiResponse.json();
     
     let finalStatus = 'PENDING';
-    // O frontend espera 'SUCCESS' para confirmar o pagamento
-    if (statusData.status === 'paid' || statusData.status === 'approved') {
+    // O frontend espera 'SUCCESS' para confirmar o pagamento (status corrigido para 'PAID')
+    if (statusData.status === 'PAID') {
         finalStatus = 'SUCCESS';
     }
     
-    console.log(`BACKEND: Status atual para ${paymentId}: ${finalStatus}`);
+    console.log(`BACKEND: Status atual para ${paymentId}: ${finalStatus} (API: ${statusData.status})`);
     res.json({ status: finalStatus });
 
   } catch (error) {
@@ -136,5 +132,5 @@ app.get('/payment-status/:id', async (req, res) => {
 
 // ** 6. INICIALIZAÇÃO DO SERVIDOR **
 app.listen(port, () => {
-  console.log(`Servidor rodando na porta ${port}`);
+  console.log(`Servidor rodando em http://localhost:${port}`);
 });
