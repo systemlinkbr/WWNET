@@ -1,0 +1,5 @@
+{
+  "name": "Balança Web Simples",
+  "description": "Uma landing page de vendas para um software de balança que funciona no navegador, com integração de pagamento via PIX.",
+  "requestFramePermissions": []
+}
