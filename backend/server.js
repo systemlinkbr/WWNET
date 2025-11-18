@@ -34,9 +34,10 @@ app.post('/create-payment', async (req, res) => {
         return res.status(400).json({ error: 'Todos os campos são obrigatórios.' });
     }
 
-    // APIs de pagamento geralmente esperam dados não formatados (apenas números)
-    const cleanCpf = cpf.replace(/\D/g, '');
-    const cleanPhone = phone.replace(/\D/g, '');
+    // AJUSTE: A documentação do AbacatePay indica que os dados de CPF e telefone
+    // devem ser enviados com a máscara. O frontend já envia os dados formatados.
+    // const cleanCpf = cpf.replace(/\D/g, ''); // Removido
+    // const cleanPhone = phone.replace(/\D/g, ''); // Removido
 
 
     // --- CHAMADA REAL PARA A API ABACATE PAY ---
@@ -47,9 +48,9 @@ app.post('/create-payment', async (req, res) => {
         description: 'Acesso Vitalício - Balança Web Simples',
         customer: {
             name: name,
-            cellphone: cleanPhone,
+            cellphone: phone, // Usando o valor original com máscara, conforme documentação
             email: email,
-            taxId: cleanCpf
+            taxId: cpf    // Usando o valor original com máscara, conforme documentação
         },
         metadata: {
             externalId: `balanca-web-${Date.now()}`
@@ -71,7 +72,7 @@ app.post('/create-payment', async (req, res) => {
       throw new Error(`Falha na comunicação com a Abacate Pay: ${abacatePayResponse.statusText}`);
     }
     
-    // Assumindo que a resposta da API tem a seguinte estrutura:
+    // A documentação do AbacatePay indica os seguintes campos na resposta de sucesso:
     // { "id": "...", "qrCodeImageBase64": "...", "qrCodeCopyPaste": "..." }
     const paymentData = await abacatePayResponse.json();
     console.log("BACKEND: Pagamento PIX criado com sucesso:", paymentData.id);
